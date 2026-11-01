@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#10101b">
+<title>Mendak AI — Test Lab</title>
+<style>
+:root{color-scheme:dark;--bg:#10101b;--panel:#191927;--panel2:#24243a;--text:#f5f3ff;--muted:#aaa7c0;--accent:#a78bfa;--border:#393750}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:20px 12px;background:radial-gradient(circle at 50% 0,#30234c,var(--bg) 52%);color:var(--text);font:16px/1.5 system-ui,sans-serif;display:flex;justify-content:center}
+.app{width:100%;max-width:680px}header{text-align:center;padding:15px 8px 22px}.mascot{width:76px;height:76px;margin:auto auto 10px;border-radius:24px;display:grid;place-items:center;font-size:43px;background:linear-gradient(145deg,#493477,#211b36);border:1px solid #66539a}
+h1{margin:0;font-size:clamp(28px,7vw,38px)}.subtitle{color:var(--muted);margin:5px 0}.status{display:inline-flex;gap:8px;align-items:center;margin-top:12px;padding:5px 11px;border:1px solid var(--border);border-radius:99px;color:var(--muted);font-size:12px}.dot{width:8px;height:8px;border-radius:50%;background:#fbbf24}
+.card{background:#191927ee;border:1px solid var(--border);border-radius:20px;padding:16px;box-shadow:0 18px 50px #0004}.notice{font-size:13px;color:var(--muted);background:#24243a;border-radius:12px;padding:11px;margin-bottom:14px}
+#chat{min-height:220px;max-height:48vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:4px 1px 14px}.bubble{max-width:88%;padding:11px 14px;border-radius:16px;white-space:pre-wrap;overflow-wrap:anywhere}.bot{align-self:flex-start;background:var(--panel2);border:1px solid var(--border)}.user{align-self:flex-end;background:#49327c}.meta{display:block;font-size:11px;color:var(--muted);margin-bottom:3px}
+.composer{display:flex;gap:9px;align-items:flex-end}textarea{flex:1;min-width:0;min-height:52px;max-height:140px;resize:vertical;padding:13px;border-radius:14px;border:1px solid var(--border);background:#11111e;color:var(--text);font:inherit;outline:none}textarea:focus{border-color:var(--accent)}
+button{border:0;border-radius:14px;min-height:52px;padding:0 18px;background:linear-gradient(135deg,var(--accent),#7c3aed);color:white;font:600 15px system-ui;cursor:pointer}button:disabled{opacity:.55;cursor:wait}.actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px}.small,footer{color:var(--muted);font-size:12px}.secondary{min-height:34px;padding:0 11px;background:transparent;border:1px solid var(--border);color:var(--muted);font-size:12px}#error{color:#fca5a5;font-size:13px;margin-top:10px;white-space:pre-wrap}footer{text-align:center;padding:17px 8px}@media(max-width:420px){.card{padding:12px}button#send{padding:0 14px}}
+</style>
+</head>
+<body>
+<main class="app">
+<header><div class="mascot" aria-hidden="true">🐸</div><h1>Mendak AI</h1><p class="subtitle">TruthLoop AI · Support Engine Test Lab</p><div class="status"><span class="dot" id="dot"></span><span id="status">Ready to test</span></div></header>
+<section class="card">
+<div class="notice">Test page only. Messages are sent to this project's <code>/api/Mendak</code> endpoint. Your Groq API key stays on the server and is never placed in this page.</div>
+<div id="chat" aria-live="polite"><div class="bubble bot"><span class="meta">MENDAK</span>Namaste! 🐸 Main Mendak hoon. Aap mujhse TruthLoop AI ke baare mein koi sawaal pooch sakte hain.</div></div>
+<form id="form"><div class="composer"><textarea id="message" maxlength="2000" placeholder="Mendak se kuch poochhiye…" required></textarea><button id="send" type="submit">Send</button></div><div class="actions"><span class="small">Maximum 2,000 characters</span><button class="secondary" id="clear" type="button">Clear chat</button></div></form>
+<div id="error" role="alert"></div></section>
+<footer>Not Answers. Patterns. · Mendak backend connection test</footer>
+</main>
+<script>
+const form=document.getElementById("form"),input=document.getElementById("message"),send=document.getElementById("send"),chat=document.getElementById("chat"),errorBox=document.getElementById("error");
+function status(t,c){document.getElementById("status").textContent=t;document.getElementById("dot").style.background=c}
+function bubble(text,type){const b=document.createElement("div");b.className="bubble "+type;const l=document.createElement("span");l.className="meta";l.textContent=type==="user"?"YOU":"MENDAK";const s=document.createElement("span");s.textContent=text;b.append(l,s);chat.append(b);chat.scrollTop=chat.scrollHeight;return b}
+form.addEventListener("submit",async e=>{e.preventDefault();const message=input.value.trim();if(!message||send.disabled)return;errorBox.textContent="";bubble(message,"user");input.value="";send.disabled=true;send.textContent="…";status("Mendak is thinking…","#fbbf24");const wait=bubble("Soch raha hoon…","bot");
+try{const r=await fetch("/api/Mendak",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message})});const d=await r.json().catch(()=>({}));wait.remove();if(!r.ok||!d.success)throw new Error(d.error||`Request failed (${r.status})`);bubble(d.reply||"Is baar response nahi mila. Dobara try kijiye.","bot");status("Connected · Reply received","#86efac")}
+catch(err){wait.remove();errorBox.textContent="Test failed: "+err.message;bubble("Maaf kijiye, abhi response nahi aa paya. Error details neeche hain.","bot");status("Connection test failed","#fca5a5")}
+finally{send.disabled=false;send.textContent="Send";input.focus()}});
+document.getElementById("clear").addEventListener("click",()=>{chat.innerHTML="";errorBox.textContent="";status("Ready to test","#fbbf24");bubble("Chat clear ho gayi. 🐸 Naya sawaal poochhiye!","bot")});
+</script>
+</body></html>
