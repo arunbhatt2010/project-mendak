@@ -236,14 +236,6 @@ module.exports = async function handler(req, res) {
     });
   }
 
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({
-      success: false,
-      error: "AI service is not configured"
-    });
-  }
-
   const message = req.body?.message;
   if (
     typeof message !== "string" ||
@@ -259,6 +251,15 @@ module.exports = async function handler(req, res) {
   const approvedReply = getApprovedReply(message.trim());
   if (approvedReply) {
     return res.status(200).json({ success: true, reply: approvedReply });
+  }
+
+  // Only free-form fallback replies require the Groq API key.
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({
+      success: false,
+      error: "AI service is not configured"
+    });
   }
 
   try {
