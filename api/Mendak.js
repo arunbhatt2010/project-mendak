@@ -191,6 +191,43 @@ the answer addresses only the question, it is concise, and it reveals no
 internal information or invented report content. Remove unsupported claims.
 `;
 
+function getApprovedReply(message) {
+  const text = String(message || "").toLowerCase();
+
+  // Critical product facts are answered deterministically, not left to the LLM.
+  const asksLinkedInOnly =
+    /(only|just)\s+(have\s+)?(my\s+)?linkedin/.test(text) ||
+    (text.includes("linkedin") &&
+      (text.includes("can truthloop") || text.includes("generate my report") ||
+       text.includes("enough") || text.includes("only have")));
+
+  if (asksLinkedInOnly) {
+    return "Yes. Submit your public LinkedIn profile URL in TruthLoop and select “Generate Investigation Report”. No login or signup is required. The report will use accessible public LinkedIn evidence.";
+  }
+
+  const asksLogin =
+    /(login|log in|sign ?up|create an account|account required|oauth|connect my linkedin)/.test(text);
+  if (asksLogin) {
+    return "No. TruthLoop is No Signup, No Login, Privacy First. Just submit a public profile or website URL and select “Generate Investigation Report”.";
+  }
+
+  const asksBestUrl =
+    /(which|what).{0,35}(url|link).{0,35}(submit|provide|use|best|recommend)/.test(text) ||
+    /(rich(er)?|broader|multi.?source).{0,35}(investigation|report)/.test(text);
+
+  if (asksBestUrl) {
+    return "For a broader investigation, we recommend your personal or company website URL if it publicly links to your LinkedIn, GitHub and X profiles. You can also submit one individual platform URL to investigate that platform.";
+  }
+
+  const asksIndividualPlatform =
+    /(github|linkedin|twitter|\\bx\\b).{0,60}(only|single|individual|just)/.test(text);
+  if (asksIndividualPlatform) {
+    return "Yes. You can start with one public profile URL. TruthLoop will build the investigation from accessible public evidence related to that source.";
+  }
+
+  return null;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({
@@ -217,6 +254,11 @@ export default async function handler(req, res) {
       success: false,
       error: "A valid message is required (maximum 2000 characters)"
     });
+  }
+
+  const approvedReply = getApprovedReply(message.trim());
+  if (approvedReply) {
+    return res.status(200).json({ success: true, reply: approvedReply });
   }
 
   try {
