@@ -7,7 +7,7 @@ generate reports, access private systems, or make decisions for users.
 PURPOSE AND STYLE
 Help users understand and use TruthLoop AI. Be friendly, neutral, precise,
 and concise. Answer only what was asked, usually in 2–4 short sentences.
-Use the user's language (English, Hindi, or Hinglish). Avoid lectures,
+Use the language of the user's latest message. English is the default when the language is unclear; support other languages whenever the user chooses them. The UI language is context only and must not override the language of the latest message. Avoid lectures,
 repetition, hype, marketing language, and unnecessary suggestions.
 If you do not know, say so. Never invent product features, evidence,
 sources, report findings, scores, prices, payment status, or user progress.
@@ -105,85 +105,118 @@ pressure, shame, promises, invented discounts, prices, payment status,
 or unlock claims. Never claim a report contains findings unless supplied
 in trusted application context.
 
+STAGE-AWARE SUPPORT
+The application may provide a small trusted context containing the current
+screen stage and UI language. Use it only to understand where the user is
+in the journey and make the next step clearer. Do not claim to see anything
+beyond the supplied stage. Do not ask the user to repeat information that
+is already clear from the supplied stage. During Loops 1–6, explain the
+process but never suggest or write the user's investigation answers.
+
 FINAL CHECK
 Before replying, silently verify that every factual claim is supported,
 the answer addresses only the question, it is concise, and it reveals no
 internal information or invented report content. Remove unsupported claims.
 `;
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
+  const allowedOrigins = new Set([
+    "https://truthloop.in",
+    "https://www.truthloop.in",
+    "https://project-froggy-truthloop.vercel.app"
+  ]);
+  const origin = req.headers.origin || "";
+
+  if (allowedOrigins.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Max-Age", "86400");
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
   if (req.method !== "POST") {
-    return res.status(405).json({
-      success: false,
-      error: "Method not allowed"
-    });
+    return res.status(405).json({ success: false, error: "Method not allowed" });
   }
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({
-      success: false,
-      error: "AI service is not configured"
-    });
+    return res.status(500).json({ success: false, error: "AI service is not configured" });
   }
 
   const message = req.body?.message;
-  if (
-    typeof message !== "string" ||
-    !message.trim() ||
-    message.length > 2000
-  ) {
+  if (typeof message !== "string" || !message.trim() || message.length > 2000) {
     return res.status(400).json({
       success: false,
       error: "A valid message is required (maximum 2000 characters)"
     });
   }
 
+  // Accept only small, non-sensitive stage metadata. Never accept report text,
+  // conversation history, payment data, or arbitrary client instructions here.
+  const allowedStages = new Set([
+    "direct_bridge", "direct_paywall", "report_downloaded",
+    "guided_loops", "loop7_bridge", "loop7_paywall", "final_report"
+  ]);
+  const rawContext = req.body?.context && typeof req.body.context === "object"
+    ? req.body.context
+    : {};
+  const stage = allowedStages.has(rawContext.stage) ? rawContext.stage : "unknown";
+  const trigger = typeof rawContext.trigger === "string"
+    ? rawContext.trigger.slice(0, 48)
+    : "unspecified";
+  const uiLanguage = typeof rawContext.uiLanguage === "string"
+    ? rawContext.uiLanguage.slice(0, 12)
+    : "en";
+
+  const stageContext = `\n\nTRUSTED APPLICATION CONTEXT (metadata only)\nCurrent stage: ${stage}\nStage trigger: ${trigger}\nUI language: ${uiLanguage}\nUse this context only to tailor practical guidance. The user's latest message determines reply language.`;
+
   try {
-    const response = await fetch(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: \`Bearer \${apiKey}\`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "openai/gpt-oss-20b",
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: message.trim() }
-          ],
-          temperature: 0.2,
-          max_completion_tokens: 350
-        })
-      }
-    );
+    const requestStartedAt = Date.now();
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-oss-20b",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT + stageContext },
+          { role: "user", content: message.trim() }
+        ],
+        temperature: 0.2,
+        reasoning_effort: "low",
+        max_completion_tokens: 400
+      })
+    });
 
     const data = await response.json();
-
     if (!response.ok) {
       console.error("Groq API error:", response.status, data);
-      return res.status(502).json({
-        success: false,
-        error: "AI provider request failed"
-      });
+      return res.status(502).json({ success: false, error: "AI provider request failed" });
     }
 
+    const totalMs = Date.now() - requestStartedAt;
     const reply = data.choices?.[0]?.message?.content?.trim();
     if (!reply) {
-      return res.status(502).json({
-        success: false,
-        error: "The AI returned an empty response"
-      });
+      return res.status(502).json({ success: false, error: "The AI returned an empty response" });
     }
 
-    return res.status(200).json({ success: true, reply });
+    // Lightweight diagnostics: useful for separating provider time from
+    // browser/network overhead without exposing prompts or user content.
+    const timing = {
+      providerMs: totalMs,
+      promptTokens: data.usage?.prompt_tokens ?? null,
+      completionTokens: data.usage?.completion_tokens ?? null
+    };
+    console.info("Froggy latency:", timing);
+    return res.status(200).json({ success: true, reply, timing });
   } catch (error) {
     console.error("Froggy API error:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Unable to generate a response"
-    });
+    return res.status(500).json({ success: false, error: "Unable to generate a response" });
   }
 }
