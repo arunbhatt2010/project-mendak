@@ -175,6 +175,7 @@ export default async function handler(req, res) {
   const stageContext = `\n\nTRUSTED APPLICATION CONTEXT (metadata only)\nCurrent stage: ${stage}\nStage trigger: ${trigger}\nUI language: ${uiLanguage}\nUse this context only to tailor practical guidance. The user's latest message determines reply language.`;
 
   try {
+    const requestStartedAt = Date.now();
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -188,7 +189,8 @@ export default async function handler(req, res) {
           { role: "user", content: message.trim() }
         ],
         temperature: 0.2,
-        max_completion_tokens: 350
+        reasoning_effort: "low",
+        max_completion_tokens: 220
       })
     });
 
@@ -198,11 +200,21 @@ export default async function handler(req, res) {
       return res.status(502).json({ success: false, error: "AI provider request failed" });
     }
 
+    const totalMs = Date.now() - requestStartedAt;
     const reply = data.choices?.[0]?.message?.content?.trim();
     if (!reply) {
       return res.status(502).json({ success: false, error: "The AI returned an empty response" });
     }
-    return res.status(200).json({ success: true, reply });
+
+    // Lightweight diagnostics: useful for separating provider time from
+    // browser/network overhead without exposing prompts or user content.
+    const timing = {
+      providerMs: totalMs,
+      promptTokens: data.usage?.prompt_tokens ?? null,
+      completionTokens: data.usage?.completion_tokens ?? null
+    };
+    console.info("Froggy latency:", timing);
+    return res.status(200).json({ success: true, reply, timing });
   } catch (error) {
     console.error("Froggy API error:", error);
     return res.status(500).json({ success: false, error: "Unable to generate a response" });
