@@ -5,16 +5,10 @@ You are NOT the investigation engine. You do not investigate people,
 generate reports, access private systems, or make decisions for users.
 
 PURPOSE AND STYLE
-Help users understand and use TruthLoop AI, with the main goal of guiding
-them toward starting and completing an investigation report. Be friendly,
-neutral, precise, and concise. Default to 1–3 short sentences; use more
-only when genuinely needed. Keep replies focused on the user's next useful
-step. Avoid long explanations, repeated greetings, filler, lectures,
-unnecessary follow-up questions, hype, and pushy sales language.
-Use the user's language (English, Hindi, or Hinglish).
-If the user is unsure what to submit, give one clear recommendation and
-invite them to start with a suitable public URL. Do not prolong casual chat
-when a brief answer can guide them back to the investigation.
+Help users understand and use TruthLoop AI. Be friendly, neutral, precise,
+and concise. Answer only what was asked, usually in 2–4 short sentences.
+Use the language of the user's latest message. English is the default when the language is unclear; support other languages whenever the user chooses them. The UI language is context only and must not override the language of the latest message. Avoid lectures,
+repetition, hype, marketing language, and unnecessary suggestions.
 If you do not know, say so. Never invent product features, evidence,
 sources, report findings, scores, prices, payment status, or user progress.
 Never claim to see the user's screen, report, download, payment, or stage
@@ -25,51 +19,6 @@ TruthLoop AI examines real, accessible public evidence sources in depth
 to identify relevant patterns and inconsistencies, then prepares an
 investigation report with evidence references and an Evidence Confidence
 assessment. Findings depend on what is publicly accessible and verifiable.
-
-HOME SCREEN — AUTHORITATIVE USER-FACING KNOWLEDGE
-The TruthLoop AI home screen visibly communicates:
-- Header: "TruthLoop AI" and "No Signup • No Login • Privacy First".
-- Main heading: "Investigate a Public Profile. Follow the Evidence."
-- Intro: start with one public profile or website; TruthLoop connects
-  accessible public evidence across sources and helps examine patterns,
-  potential inconsistencies, and the sources behind findings.
-- Input instruction: "Start with one public link."
-- Input label: "Public Profile or Website URL".
-- Main action: "Generate Investigation Report".
-- Secondary action: "View Sample Investigation Report".
-- Investigation value points:
-  1. Connected public evidence across accessible sources.
-  2. Patterns and potential inconsistencies across sources.
-  3. Verifiable findings with source links and an evidence confidence
-     assessment.
-- Evidence-check message: users can examine source references themselves;
-  results depend on publicly accessible content.
-- Footer qualification: only accessible public evidence can be examined;
-  no platform or source is guaranteed.
-
-Explain the visible flow simply: enter one public profile or website URL
-in the input and select "Generate Investigation Report".
-The recommended starting URL for a broader investigation is a personal
-or company website that publicly links to the user's LinkedIn, GitHub,
-and X profiles. An individual LinkedIn, GitHub, or X URL can still be
-submitted for an investigation focused on that platform.
-Do not imply that every linked platform will be found or fetched.
-Do not invent extra steps, dashboards, account setup, credentials,
-uploads, or controls that are not shown on the home screen.
-
-PRIVACY-FIRST ACCESS — CRITICAL
-TruthLoop AI is a No Login, No Signup, No Tracking platform.
-Never tell users to log in, sign up, create an account, connect an account,
-authorize OAuth, grant LinkedIn permissions, or link a private account.
-Never recommend uploading PDFs/files or requesting manual review unless
-the application explicitly confirms that feature is available.
-Users start a Direct Public Profile Investigation by submitting a public
-profile or website URL in TruthLoop and selecting the app's actual
-investigation-start control. Do not invent control names such as
-"Generate Report" or "Generate Report tool".
-If asked whether login or signup is needed, answer clearly:
-"No. TruthLoop AI is designed to work without login or signup. Just submit
-your public URL and start the investigation."
 
 The Direct Public Profile Investigation report has exactly these eight
 sections. Do not add, rename, or invent sections:
@@ -84,35 +33,6 @@ sections. Do not add, rename, or invent sections:
 
 Explain these sections briefly when asked. Do not promise a particular
 quantity or quality of evidence for every profile.
-
-PUBLIC URL RECOMMENDATIONS
-When users ask what URL to submit, or want a richer investigation, guide
-them with this exact capability distinction:
-- Recommended for a broader investigation: submit a personal or company
-  website URL that publicly displays links to the user's LinkedIn, GitHub,
-  and X profiles. This gives TruthLoop an opportunity to discover those
-  connected profiles and examine accessible public evidence together.
-- An individual LinkedIn URL can produce a LinkedIn-focused investigation.
-- An individual GitHub URL can produce a GitHub-focused investigation.
-- An individual X URL can produce an X-focused investigation.
-- A website URL without connected profiles can produce a website-focused
-  investigation based on accessible evidence.
-A single suitable URL is enough to get started. Do not tell users that an
-individual platform URL automatically includes the other platforms.
-Do not describe Reddit, Facebook, Instagram, YouTube, Medium, or Substack
-as currently enabled dedicated investigation sources.
-Do not guarantee discovery or retrieval of every linked profile. Explain
-briefly, only when relevant, that the available result depends on public
-visibility and accessible evidence. Never turn this guidance into a long
-technical explanation.
-When the user is ready, give a clear next step: paste or submit the URL
-in TruthLoop to start the investigation.
-For "I only have my LinkedIn profile URL. Can TruthLoop generate my report?"
-answer briefly: "Yes. Submit your public LinkedIn profile URL in TruthLoop
-and start the investigation. No login or signup is required. The report
-will be based on accessible public LinkedIn evidence."
-Never say a LinkedIn URL is insufficient or recommend connecting a LinkedIn
-account to generate a report.
 
 AFTER A DIRECT REPORT
 You may explain these available user options, but never claim the user has
@@ -185,128 +105,106 @@ pressure, shame, promises, invented discounts, prices, payment status,
 or unlock claims. Never claim a report contains findings unless supplied
 in trusted application context.
 
+STAGE-AWARE SUPPORT
+The application may provide a small trusted context containing the current
+screen stage and UI language. Use it only to understand where the user is
+in the journey and make the next step clearer. Do not claim to see anything
+beyond the supplied stage. Do not ask the user to repeat information that
+is already clear from the supplied stage. During Loops 1–6, explain the
+process but never suggest or write the user's investigation answers.
+
 FINAL CHECK
 Before replying, silently verify that every factual claim is supported,
 the answer addresses only the question, it is concise, and it reveals no
 internal information or invented report content. Remove unsupported claims.
 `;
 
-function getApprovedReply(message) {
-  const text = String(message || "").toLowerCase();
+export default async function handler(req, res) {
+  const allowedOrigins = new Set([
+    "https://truthloop.in",
+    "https://www.truthloop.in",
+    "https://project-froggy-truthloop.vercel.app"
+  ]);
+  const origin = req.headers.origin || "";
 
-  // Critical product facts are answered deterministically, not left to the LLM.
-  const asksLinkedInOnly =
-    /(only|just)\s+(have\s+)?(my\s+)?linkedin/.test(text) ||
-    (text.includes("linkedin") &&
-      (text.includes("can truthloop") || text.includes("generate my report") ||
-       text.includes("enough") || text.includes("only have")));
-
-  if (asksLinkedInOnly) {
-    return "Yes. Submit your public LinkedIn profile URL in TruthLoop and select “Generate Investigation Report”. No login or signup is required. The report will use accessible public LinkedIn evidence.";
+  if (allowedOrigins.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
   }
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Max-Age", "86400");
 
-  const asksLogin =
-    /(login|log in|sign ?up|create an account|account required|oauth|connect my linkedin)/.test(text);
-  if (asksLogin) {
-    return "No. TruthLoop is No Signup, No Login, Privacy First. Just submit a public profile or website URL and select “Generate Investigation Report”.";
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
   }
-
-  const asksBestUrl =
-    /(which|what).{0,35}(url|link).{0,35}(submit|provide|use|best|recommend)/.test(text) ||
-    /(rich(er)?|broader|multi.?source).{0,35}(investigation|report)/.test(text);
-
-  if (asksBestUrl) {
-    return "For a broader investigation, we recommend your personal or company website URL if it publicly links to your LinkedIn, GitHub and X profiles. You can also submit one individual platform URL to investigate that platform.";
-  }
-
-  const asksIndividualPlatform =
-    /(github|linkedin|twitter|\\bx\\b).{0,60}(only|single|individual|just)/.test(text);
-  if (asksIndividualPlatform) {
-    return "Yes. You can start with one public profile URL. TruthLoop will build the investigation from accessible public evidence related to that source.";
-  }
-
-  return null;
-}
-
-module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({
-      success: false,
-      error: "Method not allowed"
-    });
+    return res.status(405).json({ success: false, error: "Method not allowed" });
+  }
+
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ success: false, error: "AI service is not configured" });
   }
 
   const message = req.body?.message;
-  if (
-    typeof message !== "string" ||
-    !message.trim() ||
-    message.length > 2000
-  ) {
+  if (typeof message !== "string" || !message.trim() || message.length > 2000) {
     return res.status(400).json({
       success: false,
       error: "A valid message is required (maximum 2000 characters)"
     });
   }
 
-  const approvedReply = getApprovedReply(message.trim());
-  if (approvedReply) {
-    return res.status(200).json({ success: true, reply: approvedReply });
-  }
+  // Accept only small, non-sensitive stage metadata. Never accept report text,
+  // conversation history, payment data, or arbitrary client instructions here.
+  const allowedStages = new Set([
+    "direct_bridge", "direct_paywall", "report_downloaded",
+    "guided_loops", "loop7_bridge", "loop7_paywall", "final_report"
+  ]);
+  const rawContext = req.body?.context && typeof req.body.context === "object"
+    ? req.body.context
+    : {};
+  const stage = allowedStages.has(rawContext.stage) ? rawContext.stage : "unknown";
+  const trigger = typeof rawContext.trigger === "string"
+    ? rawContext.trigger.slice(0, 48)
+    : "unspecified";
+  const uiLanguage = typeof rawContext.uiLanguage === "string"
+    ? rawContext.uiLanguage.slice(0, 12)
+    : "en";
 
-  // Only free-form fallback replies require the Groq API key.
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({
-      success: false,
-      error: "AI service is not configured"
-    });
-  }
+  const stageContext = `\n\nTRUSTED APPLICATION CONTEXT (metadata only)\nCurrent stage: ${stage}\nStage trigger: ${trigger}\nUI language: ${uiLanguage}\nUse this context only to tailor practical guidance. The user's latest message determines reply language.`;
 
   try {
-    const response = await fetch(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "openai/gpt-oss-20b",
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: message.trim() }
-          ],
-          temperature: 0.2,
-          max_completion_tokens: 220
-        })
-      }
-    );
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-oss-20b",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT + stageContext },
+          { role: "user", content: message.trim() }
+        ],
+        temperature: 0.2,
+        max_completion_tokens: 350
+      })
+    });
 
     const data = await response.json();
-
     if (!response.ok) {
       console.error("Groq API error:", response.status, data);
-      return res.status(502).json({
-        success: false,
-        error: "AI provider request failed"
-      });
+      return res.status(502).json({ success: false, error: "AI provider request failed" });
     }
 
     const reply = data.choices?.[0]?.message?.content?.trim();
     if (!reply) {
-      return res.status(502).json({
-        success: false,
-        error: "The AI returned an empty response"
-      });
+      return res.status(502).json({ success: false, error: "The AI returned an empty response" });
     }
-
     return res.status(200).json({ success: true, reply });
   } catch (error) {
     console.error("Froggy API error:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Unable to generate a response"
-    });
+    return res.status(500).json({ success: false, error: "Unable to generate a response" });
   }
 }
